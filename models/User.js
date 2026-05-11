@@ -12,11 +12,7 @@ const UserSchema = new mongoose.Schema({
     unique: true, // Prevents duplicate registrations
     trim: true
   },
-  program: {
-    type: String,
-    required: true
-  },
-  year: {
+  programAndYear: {
     type: String,
     required: true
   },
