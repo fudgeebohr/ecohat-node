@@ -1,13 +1,11 @@
 const mongoose = require('mongoose');
 
 const UserSchema = new mongoose.Schema({
-  // Inside your UserSchema in models/User.js
   role: {
-      type: String,
-      enum: ['user', 'admin'],
-      default: 'user'
+    type: String,
+    enum: ['user', 'admin'],
+    default: 'user'
   },
-
   fullName: {
     type: String,
     required: true,
@@ -16,7 +14,7 @@ const UserSchema = new mongoose.Schema({
   studentNumber: {
     type: String,
     required: true,
-    unique: true, // Prevents duplicate registrations
+    unique: true, 
     trim: true
   },
   programAndYear: {
@@ -29,15 +27,15 @@ const UserSchema = new mongoose.Schema({
   },
   points: {
     type: Number,
-    default: 0 // New students start with 0 points
+    default: 0 
   },
   recentActivity: [
     {
-      action: String, // e.g., "Deposited PET Bottle"
+      action: String,
       date: { type: Date, default: Date.now },
       pointsEarned: Number
     }
   ]
-}, { timestamps: true }); // Automatically adds 'createdAt' and 'updatedAt'
+}, { timestamps: true });
 
 module.exports = mongoose.model('User', UserSchema);
