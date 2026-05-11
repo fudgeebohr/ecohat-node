@@ -31,7 +31,7 @@ app.get('/', (req, res) => {
     res.send('ECO-HAT Server is running!');
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT;
 app.listen(PORT, () => {
     console.log(`Server is active on port ${PORT}`);
 });
