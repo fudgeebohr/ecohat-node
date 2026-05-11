@@ -11,7 +11,7 @@ const authRoutes = require('./routes/auth');
 const app = express();
 
 // Middleware
-app.use(cors());  
+app.use(cors({ origin: 'https://eco-hat.vercel.app' }));  
 app.use(express.json());
 
 app.use((req, res, next) => {

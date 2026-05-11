@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
+const Admin = require('../models/Admin');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
@@ -54,65 +55,54 @@ router.post('/login-user', async (req, res) => {
 });
 
 // ==========================================
-// ADMIN REGISTER (Restricted Inputs)
+// ADMIN REGISTER (Separate Storage)
 // ==========================================
 router.post('/register-admin', async (req, res) => {
     try {
-        // Only accept these three specific inputs
         const { username, password, adminKey } = req.body;
 
-        // 1. Verify Secret Key from .env
         if (adminKey !== process.env.ADMIN_REGISTRATION_KEY) {
-            return res.status(401).json({ message: "Unauthorized: Invalid Admin Key." });
+            return res.status(401).json({ message: "Invalid Admin Key" });
         }
 
-        // 2. Check if admin username already exists
-        let user = await User.findOne({ studentNumber: username });
-        if (user) return res.status(400).json({ message: "Username already taken." });
+        // Check the ADMIN collection specifically
+        let admin = await Admin.findOne({ username });
+        if (admin) return res.status(400).json({ message: "Admin username taken" });
 
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // 3. Create Admin (Mapping 'username' to 'studentNumber')
-        const newAdmin = new User({
-            fullName: username, // Using username as name for simplicity
-            studentNumber: username, 
-            programAndYear: "ADMIN_LEVEL",
-            password: hashedPassword,
-            role: 'admin'
+        const newAdmin = new Admin({
+            username,
+            password: hashedPassword
         });
 
         await newAdmin.save();
-        res.status(201).json({ message: "Administrator registered successfully." });
+        res.status(201).json({ message: "Admin created in separate storage!" });
     } catch (err) {
-        res.status(500).json({ message: "Server error during admin registration." });
+        res.status(500).json({ message: "Server error" });
     }
 });
 
 // ==========================================
-// ADMIN LOGIN (Restricted Inputs)
+// ADMIN LOGIN
 // ==========================================
 router.post('/login-admin', async (req, res) => {
     try {
-        // Only accept username and password
         const { username, password } = req.body;
 
-        const user = await User.findOne({ studentNumber: username, role: 'admin' });
-        if (!user) return res.status(400).json({ message: "Administrator account not found." });
+        // Query the Admin collection
+        const admin = await Admin.findOne({ username });
+        if (!admin) return res.status(400).json({ message: "Admin account not found" });
 
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.status(400).json({ message: "Invalid admin credentials." });
+        const isMatch = await bcrypt.compare(password, admin.password);
+        if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
 
-        const token = jwt.sign({ id: user._id, role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '2h' });
+        const token = jwt.sign({ id: admin._id, role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '2h' });
 
-        res.json({ 
-            token, 
-            fullName: user.fullName, 
-            role: 'admin',
-            message: "Login Successful"
-        });
+        res.json({ token, fullName: admin.username, role: 'admin' });
     } catch (err) {
-        res.status(500).json({ message: "Server error during admin login." });
+        res.status(500).json({ message: "Server error" });
     }
 });
 
