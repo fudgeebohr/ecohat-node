@@ -1,6 +1,13 @@
 const mongoose = require('mongoose');
 
 const UserSchema = new mongoose.Schema({
+  // Inside your UserSchema in models/User.js
+  role: {
+      type: String,
+      enum: ['user', 'admin'],
+      default: 'user'
+  },
+
   fullName: {
     type: String,
     required: true,
