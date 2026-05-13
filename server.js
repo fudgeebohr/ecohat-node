@@ -15,7 +15,9 @@ const app = express();
 // Middleware
 app.use(cors({
   origin: ['https://eco-hat.onrender.com', 'http://localhost:5173'],
-  credentials: true
+  credentials: true,  // ADD THIS
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
 
