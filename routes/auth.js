@@ -106,4 +106,37 @@ router.post('/login-admin', async (req, res) => {
     }
 });
 
+// Get Top 10 users for the leaderboard
+router.get('/leaderboard', async (req, res) => {
+  try {
+    const User = require('../models/User'); // Ensure path to User model is correct
+    const topUsers = await User.find({})
+      .sort({ points: -1 })
+      .limit(10)
+      .select('fullName points');
+    res.json(topUsers);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching leaderboard' });
+  }
+});
+
+// Get current user profile (for balance and activity)
+router.get('/profile', async (req, res) => {
+  try {
+    const jwt = require('jsonwebtoken');
+    const User = require('../models/User');
+    
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: 'No token provided' });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id).select('-password');
+    
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;

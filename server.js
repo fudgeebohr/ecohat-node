@@ -8,6 +8,8 @@ require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 
+const authMiddleware = require('./middleware/auth');
+
 const app = express();
 
 // Middleware
@@ -23,6 +25,8 @@ app.use((req, res, next) => {
 });
 
 app.use('/api/auth', authRoutes);
+
+app.use('/api', authMiddleware);  // Apply auth to all /api routes
 
 // Database Connection
 mongoose.connect(process.env.MONGO_URI)
