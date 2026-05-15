@@ -111,9 +111,9 @@ router.get('/leaderboard', async (req, res) => {
   try {
     const User = require('../models/User'); // Ensure path to User model is correct
     const topUsers = await User.find({})
-      .sort({ points: -1 })
+      .sort({ totalPointsEarned: -1 })
       .limit(10)
-      .select('fullName points');
+      .select('fullName totalPointsEarned');
     res.json(topUsers);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching leaderboard' });
