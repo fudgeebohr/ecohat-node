@@ -7,10 +7,11 @@ const cors = require('cors');
 require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
-
 const authMiddleware = require('./middleware/auth');
-
 const app = express();
+
+const profileRoutes = require('./routes/auth/profile'); // check your exact path
+app.use('/api/auth', profileRoutes);
 
 // Middleware
 app.use(cors({
