@@ -139,4 +139,46 @@ router.get('/profile', async (req, res) => {
   }
 });
 
+// PUT route to update the user profile
+router.put('/profile', async (req, res) => { 
+  try {
+    const { fullName, programAndYear, studentNumber } = req.body;
+    let user = null;
+
+    // STRATEGY 1: Find by token ID (Attached by auth middleware)
+    const tokenId = req.user?.id || req.user?._id || req.user?.userId;
+    if (tokenId) {
+      user = await User.findById(tokenId);
+    }
+
+    // STRATEGY 2: Find by token studentNumber
+    if (!user && req.user?.studentNumber) {
+      user = await User.findOne({ studentNumber: req.user.studentNumber });
+    }
+
+    // STRATEGY 3: Last Resort Fallback - Find by the studentNumber in the frontend form
+    if (!user && studentNumber) {
+      user = await User.findOne({ studentNumber: studentNumber });
+    }
+
+    // IF STILL NOT FOUND: Return 404
+    if (!user) {
+      return res.status(404).json({ error: 'User not found in database.' });
+    }
+
+    // APPLY UPDATES
+    if (fullName) user.fullName = fullName;
+    if (programAndYear) user.programAndYear = programAndYear;
+    if (studentNumber) user.studentNumber = studentNumber;
+
+    // SAVE AND RESPOND
+    await user.save();
+    res.json(user);
+
+  } catch (error) {
+    console.error("Profile update error:", error);
+    res.status(500).send('Server Error');
+  }
+});
+
 module.exports = router;
