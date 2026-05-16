@@ -7,7 +7,7 @@ const auth = async (req, res, next) => {
     if (!token) return next(); // Allow public access to leaderboard
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id); 
+    const user = await Student.findById(decoded.id); 
     
     if (user) {
       req.user = {
