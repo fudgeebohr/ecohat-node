@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const Student = require('../models/User');
+const User = require('../models/User');
 
 const auth = async (req, res, next) => {
   try {
@@ -7,7 +7,7 @@ const auth = async (req, res, next) => {
     if (!token) return next(); // Allow public access to leaderboard
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await Student.findById(decoded.id); 
+    const user = await User.findById(decoded.id); 
     
     if (user) {
       req.user = {
