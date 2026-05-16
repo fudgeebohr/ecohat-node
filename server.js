@@ -10,8 +10,8 @@ const authRoutes = require('./routes/auth');
 const authMiddleware = require('./middleware/auth');
 const app = express();
 
-const profileRoutes = require('./routes/auth/profile'); // check your exact path
-app.use('/api/auth', profileRoutes);
+const profileRoutes = require('./routes/profile'); // check your exact path
+app.use('/api/profile', profileRoutes);
 
 // Middleware
 app.use(cors({
