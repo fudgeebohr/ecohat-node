@@ -109,14 +109,24 @@ router.post('/login-admin', async (req, res) => {
 // Get Top 10 users for the leaderboard
 router.get('/leaderboard', async (req, res) => {
   try {
-    const User = require('../models/User'); // Ensure path to User model is correct
-    const topUsers = await User.find({})
-      .sort({ totalPointsEarned: -1 })
+    const users = await User.find({ 
+        role: 'user',
+        privacyMode: { $ne: true } // Only fetch users where privacyMode is NOT true
+      }) 
+      .sort({ points: -1 })
       .limit(10)
-      .select('fullName totalPointsEarned');
-    res.json(topUsers);
+      .select('studentNumber fullName programAndYear points');
+
+    res.json(users.map((user, index) => ({
+      position: index + 1,
+      studentNumber: user.studentNumber,
+      fullName: user.fullName,
+      programAndYear: user.programAndYear,
+      points: user.points || 0
+    })));
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching leaderboard' });
+    console.error('Leaderboard error:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -133,8 +143,26 @@ router.get('/profile', async (req, res) => {
     const user = await User.findById(decoded.id).select('-password');
     
     if (!user) return res.status(404).json({ message: 'User not found' });
-    res.json(user);
+
+    // EDIT THIS PART: Explicitly structure the JSON response
+    res.json({
+      _id: user._id,
+      studentNumber: user.studentNumber,
+      fullName: user.fullName,
+      programAndYear: user.programAndYear,
+      role: user.role,
+      recentActivity: user.recentActivity || user.history || [],
+      
+      // Ensure these fields match what your Profile.jsx state expects:
+      points: user.points || 0,
+      totalPointsEarned: user.totalPointsEarned || 0, 
+      
+      // THIS IS THE PRIVACY MODE LINE FOR STEP 1 ITEM 2:
+      privacyMode: user.privacyMode || false 
+    });
+
   } catch (error) {
+    console.error("GET profile error:", error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -142,7 +170,7 @@ router.get('/profile', async (req, res) => {
 // PUT route to update the user profile
 router.put('/profile', async (req, res) => { 
   try {
-    const { fullName, programAndYear, studentNumber } = req.body;
+    const { fullName, programAndYear, studentNumber, privacyMode } = req.body;
     let user = null;
 
     // STRATEGY 1: Find by token ID (Attached by auth middleware)
@@ -170,6 +198,7 @@ router.put('/profile', async (req, res) => {
     if (fullName) user.fullName = fullName;
     if (programAndYear) user.programAndYear = programAndYear;
     if (studentNumber) user.studentNumber = studentNumber;
+    if (typeof privacyMode !== 'undefined') user.privacyMode = privacyMode;
 
     // SAVE AND RESPOND
     await user.save();
