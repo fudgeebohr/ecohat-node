@@ -72,11 +72,18 @@ router.get('/user-history/:studentNumber', async (req, res) => {
 router.put('/profile', async (req, res) => { 
   try {
     const { fullName, programAndYear, studentNumber } = req.body;
-    let user = await User.findById(req.user.id); 
+    const currentStudentNumber = req.user?.studentNumber || req.query.studentNumber;
+
+    if (!currentStudentNumber) {
+      return res.status(401).json({ error: 'No student number provided in token' });
+    }
+
+    let user = await User.findOne({ studentNumber: currentStudentNumber }); 
     
     if (!user) {
       return res.status(404).json({ msg: 'User not found' });
     }
+
     if (fullName) user.fullName = fullName;
     if (programAndYear) user.programAndYear = programAndYear;
     if (studentNumber) user.studentNumber = studentNumber;
