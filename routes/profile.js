@@ -71,24 +71,42 @@ router.get('/user-history/:studentNumber', async (req, res) => {
 // PUT route to update the user profile
 router.put('/profile', async (req, res) => { 
   try {
+    // ---------------- DEBUGGING LOGS ----------------
+    console.log("--- EDIT PROFILE ROUTE HIT ---");
+    console.log("1. Data inside token (req.user):", req.user);
+    console.log("2. Data from frontend (req.body):", req.body);
+    // ------------------------------------------------
+
     const { fullName, programAndYear, studentNumber } = req.body;
-    const currentStudentNumber = req.user?.studentNumber || req.query.studentNumber;
+    let user = null;
 
-    if (!currentStudentNumber) {
-      return res.status(401).json({ error: 'No student number provided in token' });
+    // STRATEGY 1: Try to find by Mongo ID (checking id, _id, or userId)
+    const tokenId = req.user?.id || req.user?._id || req.user?.userId;
+    if (tokenId) {
+      user = await User.findById(tokenId);
+      console.log("3a. Searched by ID. Found user in DB:", user ? "Yes" : "No");
     }
 
-    let user = await User.findOne({ studentNumber: currentStudentNumber }); 
-    
+    // STRATEGY 2: Fallback - Try to find by the original student number in the token
+    if (!user && req.user?.studentNumber) {
+      user = await User.findOne({ studentNumber: req.user.studentNumber });
+      console.log("3b. Searched by Student Number. Found user in DB:", user ? "Yes" : "No");
+    }
+
+    // IF STILL NOT FOUND: Throw the 404
     if (!user) {
-      return res.status(404).json({ msg: 'User not found' });
+      console.log("4. ERROR: Could not locate user in DB based on token.");
+      return res.status(404).json({ error: 'User not found in database.' });
     }
 
+    // APPLY UPDATES
     if (fullName) user.fullName = fullName;
     if (programAndYear) user.programAndYear = programAndYear;
     if (studentNumber) user.studentNumber = studentNumber;
 
+    // SAVE AND RESPOND
     await user.save();
+    console.log("5. SUCCESS: Profile updated for:", user.fullName);
     res.json(user);
 
   } catch (error) {
