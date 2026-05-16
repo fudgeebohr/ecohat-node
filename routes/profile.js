@@ -77,17 +77,17 @@ router.put('/profile', async (req, res) => {
     // STRATEGY 1: Find by token ID (Attached by auth middleware)
     const tokenId = req.user?.id || req.user?._id || req.user?.userId;
     if (tokenId) {
-      user = await Student.findById(tokenId);
+      user = await User.findById(tokenId);
     }
 
     // STRATEGY 2: Find by token studentNumber
     if (!user && req.user?.studentNumber) {
-      user = await Student.findOne({ studentNumber: req.user.studentNumber });
+      user = await User.findOne({ studentNumber: req.user.studentNumber });
     }
 
     // STRATEGY 3: Last Resort Fallback - Find by the studentNumber in the frontend form
     if (!user && studentNumber) {
-      user = await Student.findOne({ studentNumber: studentNumber });
+      user = await User.findOne({ studentNumber: studentNumber });
     }
 
     // IF STILL NOT FOUND: Return 404
