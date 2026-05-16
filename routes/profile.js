@@ -68,4 +68,26 @@ router.get('/user-history/:studentNumber', async (req, res) => {
   }
 });
 
+// PUT route to update the user profile
+router.put('/profile', async (req, res) => { 
+  try {
+    const { fullName, programAndYear, studentNumber } = req.body;
+    let user = await User.findById(req.user.id); 
+    
+    if (!user) {
+      return res.status(404).json({ msg: 'User not found' });
+    }
+    if (fullName) user.fullName = fullName;
+    if (programAndYear) user.programAndYear = programAndYear;
+    if (studentNumber) user.studentNumber = studentNumber;
+
+    await user.save();
+    res.json(user);
+
+  } catch (error) {
+    console.error("Profile update error:", error);
+    res.status(500).send('Server Error');
+  }
+});
+
 module.exports = router;
