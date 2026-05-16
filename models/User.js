@@ -39,7 +39,12 @@ const UserSchema = new mongoose.Schema({
       date: { type: Date, default: Date.now },
       pointsEarned: Number
     }
-  ]
+  ],
+  privacyMode: 
+    { 
+      type: Boolean, 
+      default: false 
+    }
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', UserSchema);
