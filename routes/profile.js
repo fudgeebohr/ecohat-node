@@ -83,13 +83,13 @@ router.put('/profile', async (req, res) => {
     // STRATEGY 1: Try to find by Mongo ID (checking id, _id, or userId)
     const tokenId = req.user?.id || req.user?._id || req.user?.userId;
     if (tokenId) {
-      user = await User.findById(tokenId);
+      user = await Student.findById(tokenId);
       console.log("3a. Searched by ID. Found user in DB:", user ? "Yes" : "No");
     }
 
     // STRATEGY 2: Fallback - Try to find by the original student number in the token
     if (!user && req.user?.studentNumber) {
-      user = await User.findOne({ studentNumber: req.user.studentNumber });
+      user = await Student.findOne({ studentNumber: req.user.studentNumber });
       console.log("3b. Searched by Student Number. Found user in DB:", user ? "Yes" : "No");
     }
 
