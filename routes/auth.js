@@ -122,7 +122,7 @@ router.get('/leaderboard', async (req, res) => {
       studentNumber: user.studentNumber,
       fullName: user.fullName,
       programAndYear: user.programAndYear,
-      points: user.points || 0
+      totalPointsEarned: user.totalPointsEarned || 0
     })));
   } catch (error) {
     console.error('Leaderboard error:', error);
