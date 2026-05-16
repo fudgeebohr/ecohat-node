@@ -71,31 +71,27 @@ router.get('/user-history/:studentNumber', async (req, res) => {
 // PUT route to update the user profile
 router.put('/profile', async (req, res) => { 
   try {
-    // ---------------- DEBUGGING LOGS ----------------
-    console.log("--- EDIT PROFILE ROUTE HIT ---");
-    console.log("1. Data inside token (req.user):", req.user);
-    console.log("2. Data from frontend (req.body):", req.body);
-    // ------------------------------------------------
-
     const { fullName, programAndYear, studentNumber } = req.body;
     let user = null;
 
-    // STRATEGY 1: Try to find by Mongo ID (checking id, _id, or userId)
+    // STRATEGY 1: Find by token ID (Attached by auth middleware)
     const tokenId = req.user?.id || req.user?._id || req.user?.userId;
     if (tokenId) {
       user = await Student.findById(tokenId);
-      console.log("3a. Searched by ID. Found user in DB:", user ? "Yes" : "No");
     }
 
-    // STRATEGY 2: Fallback - Try to find by the original student number in the token
+    // STRATEGY 2: Find by token studentNumber
     if (!user && req.user?.studentNumber) {
       user = await Student.findOne({ studentNumber: req.user.studentNumber });
-      console.log("3b. Searched by Student Number. Found user in DB:", user ? "Yes" : "No");
     }
 
-    // IF STILL NOT FOUND: Throw the 404
+    // STRATEGY 3: Last Resort Fallback - Find by the studentNumber in the frontend form
+    if (!user && studentNumber) {
+      user = await Student.findOne({ studentNumber: studentNumber });
+    }
+
+    // IF STILL NOT FOUND: Return 404
     if (!user) {
-      console.log("4. ERROR: Could not locate user in DB based on token.");
       return res.status(404).json({ error: 'User not found in database.' });
     }
 
@@ -106,7 +102,6 @@ router.put('/profile', async (req, res) => {
 
     // SAVE AND RESPOND
     await user.save();
-    console.log("5. SUCCESS: Profile updated for:", user.fullName);
     res.json(user);
 
   } catch (error) {
