@@ -135,32 +135,16 @@ router.get('/profile', async (req, res) => {
   try {
     const jwt = require('jsonwebtoken');
     const User = require('../models/User');
-    
+
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).json({ message: 'No token provided' });
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id).select('-password');
-    
-    if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // Send back the raw document fields directly, adding explicit defaults safely
-    res.json({
-      _id: user._id,
-      studentNumber: user.studentNumber,
-      fullName: user.fullName,
-      programAndYear: user.programAndYear,
-      role: user.role,
-      recentActivity: user.recentActivity || user.history || [],
-      points: user.points || 0,
-      
-      // Dynamic fallback: if totalPointsEarned doesn't exist, use points instead
-      totalPointsEarned: user.totalPointsEarned || 0, 
-      
-      privacyMode: user.privacyMode || false 
-    });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json(user);
   } catch (error) {
-    console.error("Profile fetch error:", error);
     res.status(500).json({ message: 'Server error' });
   }
 });
