@@ -106,27 +106,33 @@ router.post('/login-admin', async (req, res) => {
     }
 });
 
-// Get Top 10 users for the leaderboard
+// GET /api/leaderboard - Top 10 users sorted by total points (excluding private profiles)
 router.get('/leaderboard', async (req, res) => {
   try {
+    const User = require('../models/User'); // Explicitly imported cleanly here
+
+    // 1. Fetch top 10 users who are students and have NOT turned on privacy mode
     const users = await User.find({ 
         role: 'user',
-        privacyMode: { $ne: true } // Only fetch users where privacyMode is NOT true
+        privacyMode: { $ne: true } 
       }) 
-      .sort({ points: -1 })
+      .sort({ points: -1 }) // Sorts by active points highest to lowest
       .limit(10)
-      .select('studentNumber fullName programAndYear points');
+      .select('studentNumber fullName programAndYear totalPointsEarned');
 
-    res.json(users.map((user, index) => ({
+    // 2. Map the data structure cleanly for your frontend table rows
+    const formattedLeaderboard = users.map((user, index) => ({
       position: index + 1,
       studentNumber: user.studentNumber,
       fullName: user.fullName,
       programAndYear: user.programAndYear,
       totalPointsEarned: user.totalPointsEarned || 0
-    })));
+    }));
+
+    res.json(formattedLeaderboard);
   } catch (error) {
     console.error('Leaderboard error:', error);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error fetching leaderboard' });
   }
 });
 
