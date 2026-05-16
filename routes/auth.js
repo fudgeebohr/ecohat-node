@@ -46,6 +46,12 @@ router.post('/login-user', async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(400).json({ message: "Invalid student credentials." });
 
+        if (user.isArchived) {
+          user.isArchived = false; // Un-archive/Reactivate dynamically
+          await user.save();
+          console.log(`Account reactivated automatically for: ${user.fullName}`);
+        }
+
         const token = jwt.sign({ id: user._id, role: 'user' }, process.env.JWT_SECRET, { expiresIn: '2h' });
 
         res.json({ token, fullName: user.fullName, role: 'user' });
@@ -114,7 +120,8 @@ router.get('/leaderboard', async (req, res) => {
     // 1. Fetch top 10 users who are students and have NOT turned on privacy mode
     const users = await User.find({ 
         role: 'user',
-        privacyMode: { $ne: true } 
+        privacyMode: { $ne: true },
+        isArchived: { $ne: true }
       }) 
       .sort({ points: -1 }) // Sorts by active points highest to lowest
       .limit(10)
@@ -187,6 +194,30 @@ router.put('/profile', async (req, res) => {
   } catch (error) {
     console.error("Profile update error:", error);
     res.status(500).send('Server Error');
+  }
+});
+
+// POST /api/auth/deactivate - Archive user account
+router.post('/deactivate', async (req, res) => {
+  try {
+    const jwt = require('jsonwebtoken');
+    const User = require('../models/User');
+    
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: 'No token provided' });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    let user = await User.findById(decoded.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Mark the account as archived/deactivated
+    user.isArchived = true;
+    await user.save();
+
+    res.json({ message: 'Account archived successfully' });
+  } catch (error) {
+    console.error("Deactivation error:", error);
+    res.status(500).json({ message: 'Server error during deactivation' });
   }
 });
 

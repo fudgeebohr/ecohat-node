@@ -40,11 +40,14 @@ const UserSchema = new mongoose.Schema({
       pointsEarned: Number
     }
   ],
-  privacyMode: 
-    { 
+  privacyMode: { 
       type: Boolean, 
       default: false 
-    }
+  },
+  isArchived: { 
+    type: Boolean, 
+    default: false 
+  }
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', UserSchema);
