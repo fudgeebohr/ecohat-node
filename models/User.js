@@ -47,7 +47,7 @@ const UserSchema = new mongoose.Schema({
   isArchived: { 
     type: Boolean, 
     default: false 
-  }
+  },
   cart: [
     {
       itemId: { type: Number, required: true }, // Matches your item.id
