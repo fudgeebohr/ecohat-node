@@ -222,6 +222,28 @@ router.post('/deactivate', async (req, res) => {
   }
 });
 
+router.post('/cart/sync', async (req, res) => {
+  try {
+    const jwt = require('jsonwebtoken');
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: 'No token provided' });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // Replace the user's cart in MongoDB with the fresh array from the frontend
+    const user = await User.findById(decoded.id);
+    if (!user) return res.status(404).json({ message: 'User missing' });
+
+    user.cart = req.body.cart; // Sync array payload
+    await user.save();
+
+    res.json({ success: true, message: 'Cart synced across cloud cloud nodes successfully.' });
+  } catch (error) {
+    console.error('Cloud synchronization failure:', error);
+    res.status(500).json({ message: 'Server error during sync operations.' });
+  }
+});
+
 router.post('/rewards/checkout-cart', async (req, res) => {
   try {
     const { items, totalCost } = req.body;
