@@ -4,6 +4,7 @@ const User = require('../models/User');
 const Admin = require('../models/Admin');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 // ==========================================
 // 1. STUDENT REGISTER
@@ -218,6 +219,52 @@ router.post('/deactivate', async (req, res) => {
   } catch (error) {
     console.error("Deactivation error:", error);
     res.status(500).json({ message: 'Server error during deactivation' });
+  }
+});
+
+router.post('/rewards/checkout-cart', async (req, res) => {
+  try {
+    const { items, totalCost } = req.body;
+    
+    // Locate active user from token decoding session layers
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User profile missing." });
+
+    // Validate balance point thresholds securely on the server side
+    if (user.points < totalCost) {
+      return res.status(400).json({ message: "Security Warning: Insufficient point bounds." });
+    }
+
+    // 1. Deduct points balance
+    user.points -= totalCost;
+
+    // 2. Generate a single cryptographic reference token signature for this multi-item batch
+    const uniqueBatchToken = `ECO-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
+
+    // 3. Compile structural description text detailing the cart items grouped together
+    const cartSummaryText = items.map(i => `${i.quantity}x ${i.name}`).join(', ');
+
+    // 4. Append into the user's Unified History schema array tracking records
+    user.recentActivity.unshift({
+      action: "Rewards Redemption",
+      points: -totalCost, // negative points deduction
+      description: `Redeemed multi-item supply bundle: ${cartSummaryText}`,
+      qrReferenceCode: uniqueBatchToken,
+      isScanned: false, // flag stays false until scanned at physical kiosk
+      date: new Date()
+    });
+
+    await user.save();
+
+    res.json({
+      success: true,
+      qrTokenString: uniqueBatchToken, // This string gets read directly by the frontend QR renderer
+      remainingPoints: user.points
+    });
+
+  } catch (error) {
+    console.error("Server processing error during cart dump:", error);
+    res.status(500).json({ message: "Internal server compilation failures." });
   }
 });
 
