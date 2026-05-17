@@ -248,63 +248,78 @@ router.post('/rewards/checkout-cart', async (req, res) => {
   try {
     const { items, totalCost } = req.body;
     
-    // 1. EXTRACT AND DECODE THE TOKEN MANUALLY (Fixes the undefined crash)
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).json({ message: 'No token provided' });
-
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
-    // 2. Locate active user from the decoded token ID
     const user = await User.findById(decoded.id);
     if (!user) return res.status(404).json({ message: "User profile missing." });
 
-    // Validate balance point thresholds securely on the server side
+    // Still validate balance thresholds on generation to prevent spamming
     if (user.points < totalCost) {
-      return res.status(400).json({ message: "Security Warning: Insufficient point bounds." });
+      return res.status(400).json({ message: "Insufficient points balance." });
     }
 
-    // 3. Deduct points balance
-    user.points -= totalCost;
-
-    // 4. Generate a secure token signature for this batch
+    // 1. Generate the unique voucher code reference string
     const uniqueBatchToken = `ECO-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
-
-    // 5. Compile structural description text
     const cartSummaryText = items.map(i => `${i.quantity}x ${i.name}`).join(', ');
 
-    // 6. Push to recentActivity (ensure this matches your model key exactly)
-    // If your user model uses user.history instead, change this to user.history.unshift(...)
-    const newActivity = {
-      action: "Rewards Redemption",
-      points: -totalCost,
-      description: `Redeemed item/s: ${cartSummaryText}`,
-      qrReferenceCode: uniqueBatchToken,
-      isScanned: false,
-      date: new Date()
-    };
-
-    if (user.recentActivity) {
-      user.recentActivity.unshift(newActivity);
-    } else if (user.history) {
-      user.history.unshift(newActivity);
-    } else {
-      user.recentActivity = [newActivity];
-    }
-
-    // 7. Clear the cloud cart array inside MongoDB upon successful checkout processing!
-    user.cart = []; 
-
+    // 2. Clear out their active cloud bag array profile since it's now wrapped inside a token
+    user.cart = [];
     await user.save();
 
+    // 3. Return the payload. The user's points stay untouched for now!
     res.json({
       success: true,
       qrTokenString: uniqueBatchToken,
-      remainingPoints: user.points
+      totalCost: totalCost,
+      summary: cartSummaryText
     });
 
   } catch (error) {
-    console.error("Server processing error during checkout processing:", error);
-    res.status(500).json({ message: "Internal server compilation failures." });
+    console.error("Checkout validation error:", error);
+    res.status(500).json({ message: "Internal server error during token generation." });
+  }
+});
+
+router.post('/admin/verify-redemption', async (req, res) => {
+  try {
+    const { qrTokenString, studentNumber, totalCost, summary } = req.body;
+
+    // 1. Double check the user exists
+    const user = await User.findOne({ studentNumber });
+    if (!user) return res.status(404).json({ message: "Student account not found." });
+
+    // 2. Validate live balance bounds before executing deductions
+    if (user.points < totalCost) {
+      return res.status(400).json({ message: "Deduction failed: Student has insufficient points live." });
+    }
+
+    // 3. SECURE ATOMICITY: Execute your precise MongoDB query structure completely in one go
+    await User.updateOne(
+      { studentNumber: studentNumber },
+      {
+        $inc: { points: -Number(totalCost) }, 
+        $push: {
+          history: {
+            type: "redeem",
+            points: -Number(totalCost),
+            date: new Date(),
+            description: `${summary} Redeemed`,
+            qrReferenceCode: qrTokenString // Track token matching validation identifiers
+          }
+        }
+      }
+    );
+
+    res.json({ 
+      success: true, 
+      message: `Successfully processed redemption for ${user.fullName}! Points deducted: -${totalCost}` 
+    });
+
+  } catch (error) {
+    console.error("Admin scanning processing execution failure:", error);
+    res.status(500).json({ message: "Server error during scanner confirmation verification processing loops." });
   }
 });
 
