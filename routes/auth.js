@@ -286,31 +286,27 @@ router.post('/admin/verify-redemption', async (req, res) => {
   try {
     const { qrTokenString, studentNumber, totalCost, summary } = req.body;
 
-    // 1. Fetch the user's current record to check their schema fields
+    // 1. Double check the user exists
     const user = await User.findOne({ studentNumber });
     if (!user) return res.status(404).json({ message: "Student account not found." });
 
+    // 2. Validate live balance bounds before executing deductions
     if (user.points < totalCost) {
       return res.status(400).json({ message: "Deduction failed: Student has insufficient points live." });
     }
 
-    // 2. Dynamically determine which array field to target
-    // If 'recentActivity' exists in the document, use it; otherwise, fallback to 'history'
-    const targetActivityField = ('recentActivity' in user.toObject()) ? 'recentActivity' : 'history';
-
-    // 3. SECURE ATOMICITY: Execute the update using our dynamic field key variable
+    // 3. SECURE ATOMICITY: Execute your precise MongoDB query structure completely in one go
     await User.updateOne(
       { studentNumber: studentNumber },
       {
         $inc: { points: -Number(totalCost) }, 
         $push: {
-          [targetActivityField]: { // ◄ Computed property name syntax [key] handles this dynamically!
-            action: "Rewards Redemption",
-            type: "redeem", // Including both properties guarantees compatibility regardless of front-end map fields
+          history: {
+            type: "redeem",
             points: -Number(totalCost),
             date: new Date(),
-            description: `Redeemed item/s: ${summary}`,
-            qrReferenceCode: qrTokenString
+            description: `${summary} Redeemed`,
+            qrReferenceCode: qrTokenString // Track token matching validation identifiers
           }
         }
       }
