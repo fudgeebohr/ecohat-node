@@ -33,11 +33,14 @@ const UserSchema = new mongoose.Schema({
     enum: ['user', 'admin'],
     default: 'user'
   },
-  recentActivity: [
+  history: [
     {
-      action: String,
+      action: { type: String },       
+      type: { type: String },        
+      points: { type: Number },       
       date: { type: Date, default: Date.now },
-      pointsEarned: Number
+      description: { type: String },  
+      qrReferenceCode: { type: String } 
     }
   ],
   privacyMode: { 
