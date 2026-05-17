@@ -248,8 +248,14 @@ router.post('/rewards/checkout-cart', async (req, res) => {
   try {
     const { items, totalCost } = req.body;
     
-    // Locate active user from token decoding session layers
-    const user = await User.findById(req.user.id);
+    // 1. EXTRACT AND DECODE THE TOKEN MANUALLY (Fixes the undefined crash)
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: 'No token provided' });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // 2. Locate active user from the decoded token ID
+    const user = await User.findById(decoded.id);
     if (!user) return res.status(404).json({ message: "User profile missing." });
 
     // Validate balance point thresholds securely on the server side
@@ -257,35 +263,47 @@ router.post('/rewards/checkout-cart', async (req, res) => {
       return res.status(400).json({ message: "Security Warning: Insufficient point bounds." });
     }
 
-    // 1. Deduct points balance
+    // 3. Deduct points balance
     user.points -= totalCost;
 
-    // 2. Generate a single cryptographic reference token signature for this multi-item batch
+    // 4. Generate a secure token signature for this batch
     const uniqueBatchToken = `ECO-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
 
-    // 3. Compile structural description text detailing the cart items grouped together
+    // 5. Compile structural description text
     const cartSummaryText = items.map(i => `${i.quantity}x ${i.name}`).join(', ');
 
-    // 4. Append into the user's Unified History schema array tracking records
-    user.recentActivity.unshift({
+    // 6. Push to recentActivity (ensure this matches your model key exactly)
+    // If your user model uses user.history instead, change this to user.history.unshift(...)
+    const newActivity = {
       action: "Rewards Redemption",
-      points: -totalCost, // negative points deduction
-      description: `Redeemed multi-item supply bundle: ${cartSummaryText}`,
+      points: -totalCost,
+      description: `Redeemed item/s: ${cartSummaryText}`,
       qrReferenceCode: uniqueBatchToken,
-      isScanned: false, // flag stays false until scanned at physical kiosk
+      isScanned: false,
       date: new Date()
-    });
+    };
+
+    if (user.recentActivity) {
+      user.recentActivity.unshift(newActivity);
+    } else if (user.history) {
+      user.history.unshift(newActivity);
+    } else {
+      user.recentActivity = [newActivity];
+    }
+
+    // 7. Clear the cloud cart array inside MongoDB upon successful checkout processing!
+    user.cart = []; 
 
     await user.save();
 
     res.json({
       success: true,
-      qrTokenString: uniqueBatchToken, // This string gets read directly by the frontend QR renderer
+      qrTokenString: uniqueBatchToken,
       remainingPoints: user.points
     });
 
   } catch (error) {
-    console.error("Server processing error during cart dump:", error);
+    console.error("Server processing error during checkout processing:", error);
     res.status(500).json({ message: "Internal server compilation failures." });
   }
 });
