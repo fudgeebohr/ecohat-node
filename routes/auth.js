@@ -323,4 +323,73 @@ router.post('/admin/verify-redemption', async (req, res) => {
   }
 });
 
+// ─── GET ADMIN DASHBOARD STATS OVERVIEW ──────────────────────────────────
+router.get('/admin/bottle-stats', async (req, res) => {
+  try {
+    const now = new Date();
+
+    // 1. Define Temporal Boundaries (Using UTC/Local Midnights)
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    const startOfWeek = new Date(now);
+    const dayOfWeek = now.getDay(); // 0 (Sun) - 6 (Sat)
+    startOfWeek.setDate(now.getDate() - dayOfWeek);
+    startOfWeek.setHours(0,0,0,0);
+
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // Helper helper function to run the MongoDB unwind + aggregation pipeline
+    const getIntakeSum = async (startDate) => {
+      const result = await User.aggregate([
+        { $unwind: "$history" }, // Flatten the history array elements out into separate documents
+        { 
+          $match: { 
+            "history.type": "deposit",
+            "history.date": { $gte: startDate }
+          } 
+        },
+        {
+          // We need to parse out the number of bottles from the description string
+          // e.g., "24 Bottles Deposited" -> extract 24
+          $project: {
+            bottlesCount: {
+              $convert: {
+                input: { $arrayElemAt: [{ $split: ["$history.description", " "] }, 0] },
+                to: "int",
+                onError: 0,
+                onNull: 0
+              }
+            }
+          }
+        },
+        { 
+          $group: { 
+            _id: null, 
+            total: { $sum: "$bottlesCount" } 
+          } 
+        }
+      ]);
+      return result.length > 0 ? result[0].total : 0;
+    };
+
+    // 2. Execute aggregations in parallel paths
+    const [todayCount, weeklyCount, monthlyCount] = await Promise.all([
+      getIntakeSum(startOfToday),
+      getIntakeSum(startOfWeek),
+      getIntakeSum(startOfMonth)
+    ]);
+
+    res.json({
+      success: true,
+      today: todayCount,
+      weekly: weeklyCount,
+      monthly: monthlyCount
+    });
+
+  } catch (error) {
+    console.error("Aggregation stats breakdown crash:", error);
+    res.status(500).json({ message: "Failed to compile intake dashboard metrics." });
+  }
+});
+
 module.exports = router;
