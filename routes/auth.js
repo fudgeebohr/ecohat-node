@@ -438,4 +438,14 @@ router.post('/admin/inventory/update', async (req, res) => {
   }
 });
 
+// GET LIVE INVENTORY FOR STUDENTS (Read-Only)
+router.get('/rewards/inventory', async (req, res) => {
+  try {
+    const items = await Item.find().sort({ id: 1 });
+    res.json({ success: true, inventory: items });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to load rewards inventory options." });
+  }
+});
+
 module.exports = router;
