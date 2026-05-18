@@ -5,6 +5,7 @@ const Admin = require('../models/Admin');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const Item = require('./models/Item');
 
 // ==========================================
 // 1. STUDENT REGISTER
@@ -389,6 +390,51 @@ router.get('/admin/bottle-stats', async (req, res) => {
   } catch (error) {
     console.error("Aggregation stats breakdown crash:", error);
     res.status(500).json({ message: "Failed to compile intake dashboard metrics." });
+  }
+});
+
+// GET ALL INVENTORY STOCK ITEMS
+router.get('/admin/inventory', async (req, res) => {
+  try {
+    // If the database is completely empty (first run), seed your default list automatically
+    let items = await Item.find().sort({ id: 1 });
+    
+    if (items.length === 0) {
+      const defaultItems = [
+        { id: 1, name: 'Notebook', price: 50, stock: 95 },
+        { id: 2, name: 'Ballpen', price: 20, stock: 98 },
+        { id: 3, name: 'Pencil', price: 15, stock: 89 },
+        { id: 4, name: 'Yellow Paper', price: 40, stock: 50 },
+        { id: 5, name: 'Scissors', price: 60, stock: 30 },
+        { id: 6, name: 'Crayons', price: 80, stock: 25 },
+        { id: 7, name: 'Ruler', price: 25, stock: 40 },
+        { id: 8, name: 'Eraser', price: 10, stock: 120 },
+        { id: 9, name: 'Folder', price: 15, stock: 200 },
+        { id: 10, name: 'Correction Tape', price: 45, stock: 15 }
+      ];
+      items = await Item.insertMany(defaultItems);
+    }
+    
+    res.json({ success: true, inventory: items });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch inventory storage maps." });
+  }
+});
+
+// POST UPDATE SPECIFIC ITEM STOCK LIMIT
+router.post('/admin/inventory/update', async (req, res) => {
+  const { id, newStock } = req.body;
+  try {
+    const updatedItem = await Item.findOneAndUpdate(
+      { id: Number(id) },
+      { $set: { stock: Number(newStock) } },
+      { new: true }
+    );
+    if (!updatedItem) return res.status(404).json({ message: "Item not found." });
+    
+    res.json({ success: true, message: `${updatedItem.name} stock updated to ${newStock}!`, item: updatedItem });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to execute stock update parameters." });
   }
 });
 
