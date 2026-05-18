@@ -5,7 +5,7 @@ const Admin = require('../models/Admin');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const Item = require('./models/Item');
+const Item = require('../models/Item');
 
 // ==========================================
 // 1. STUDENT REGISTER
