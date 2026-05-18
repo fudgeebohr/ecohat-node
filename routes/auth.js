@@ -291,23 +291,46 @@ router.post('/admin/verify-redemption', async (req, res) => {
     const user = await User.findOne({ studentNumber });
     if (!user) return res.status(404).json({ message: "Student account not found." });
 
-    // 2. Validate live balance bounds before executing deductions
-    if (user.points < totalCost) {
-      return res.status(400).json({ message: "Deduction failed: Student has insufficient points live." });
+    // ─── NEW: DECREMENT GLOBAL KIOSK INVENTORY STOCK LEVELS ────────────────
+    // Splits your summary template string: "2x Ballpen, 1x Notebook" -> ["2x Ballpen", "1x Notebook"]
+    if (summary && summary.trim() !== "") {
+      const itemSegments = summary.split(', ');
+
+      const stockUpdatePromises = itemSegments.map(async (segment) => {
+        const parts = segment.trim().split(' ');
+        if (parts.length >= 2) {
+          const qtyPart = parts[0]; // e.g., "2x"
+          const quantityClaimed = parseInt(qtyPart.replace('x', ''), 10);
+          
+          // Safely reconstruct item names like "Yellow Paper" if they contain spaces
+          const itemName = parts.slice(1).join(' '); 
+
+          if (!isNaN(quantityClaimed) && quantityClaimed > 0) {
+            // Drops the stock level for this supply item by using a negative incrementor
+            await Item.findOneAndUpdate(
+              { name: itemName },
+              { $inc: { stock: -quantityClaimed } }
+            );
+          }
+        }
+      });
+
+      // Execute all item stock updates in parallel execution threads
+      await Promise.all(stockUpdatePromises);
     }
 
-    // 3. SECURE ATOMICITY: Execute your precise MongoDB query structure completely in one go
+    // 2. SECURE ATOMICITY: Log the ledger tracking event inside user transaction history
+    // NOTE: Removed the points deduction here to prevent double-charging the student!
     await User.updateOne(
       { studentNumber: studentNumber },
       {
-        $inc: { points: -Number(totalCost) }, 
         $push: {
           history: {
             type: "redeem",
-            points: -Number(totalCost),
+            points: -Number(totalCost), // Displays as a negative ledger log row inside their activity feeds
             date: new Date(),
             description: `${summary} Redeemed`,
-            qrReferenceCode: qrTokenString // Track token matching validation identifiers
+            qrReferenceCode: qrTokenString 
           }
         }
       }
@@ -315,7 +338,7 @@ router.post('/admin/verify-redemption', async (req, res) => {
 
     res.json({ 
       success: true, 
-      message: `Successfully processed redemption for ${user.fullName}! Points deducted: -${totalCost}` 
+      message: `Successfully processed redemption for ${user.fullName}! Kiosk inventory adjusted.` 
     });
 
   } catch (error) {
