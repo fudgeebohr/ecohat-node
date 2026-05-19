@@ -471,4 +471,39 @@ router.get('/rewards/inventory', async (req, res) => {
   }
 });
 
+const TransparencyLog = require('../models/TransparencyLog'); // Verify path syntax matches your system
+
+// 1. GET ALL TRANSPARENCY LEDGER ENTRIES (Sorted newest first)
+router.get('/admin/transparency-logs', async (req, res) => {
+  try {
+    const logs = await TransparencyLog.find().sort({ date: -1 });
+    res.json({ success: true, logs });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to load transparency reports ledger entries." });
+  }
+});
+
+// 2. POST REGISTER A NEW LOG ENTRY
+router.post('/admin/transparency-logs/add', async (req, res) => {
+  try {
+    const { amount, description, receiptUrl, loggedBy } = req.body;
+    
+    if (!amount || !description) {
+      return res.status(400).json({ message: "Amount and description fields are mandatory." });
+    }
+
+    const newLog = new TransparencyLog({
+      amount: Number(amount),
+      description,
+      receiptUrl,
+      loggedBy: loggedBy || 'Admin'
+    });
+
+    await newLog.save();
+    res.json({ success: true, message: "Transaction entry logged successfully!", log: newLog });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to record transparency transaction parameter logs." });
+  }
+});
+
 module.exports = router;
