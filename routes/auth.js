@@ -424,17 +424,27 @@ router.get('/admin/inventory', async (req, res) => {
     
     if (items.length === 0) {
       const defaultItems = [
-        { id: 1, name: 'Notebook', price: 50, stock: 95 },
-        { id: 2, name: 'Ballpen', price: 20, stock: 98 },
-        { id: 3, name: 'Pencil', price: 15, stock: 89 },
-        { id: 4, name: 'Yellow Paper', price: 40, stock: 50 },
-        { id: 5, name: 'Scissors', price: 60, stock: 30 },
-        { id: 6, name: 'Crayons', price: 80, stock: 25 },
-        { id: 7, name: 'Ruler', price: 25, stock: 40 },
-        { id: 8, name: 'Eraser', price: 10, stock: 120 },
-        { id: 9, name: 'Folder', price: 15, stock: 200 },
-        { id: 10, name: 'Correction Tape', price: 45, stock: 15 }
+        // ─── SCHOOL SUPPLIES SECTION ────────────────────────────────────────
+        { id: 1, name: 'Ruler', price: 20, stock: 40 },
+        { id: 2, name: 'Bond Papers (2 pcs)', price: 10, stock: 150 },
+        { id: 3, name: 'Yellow Paper (Whole Pad)', price: 60, stock: 50 },
+        { id: 4, name: 'Yellow Paper (Half Pad)', price: 40, stock: 50 },
+        { id: 5, name: 'Yellow Paper (5 sheets)', price: 4, stock: 100 },
+        { id: 6, name: 'Pencils', price: 30, stock: 89 },
+        { id: 7, name: 'Ballpens', price: 20, stock: 98 },
+        { id: 8, name: 'Notebook', price: 60, stock: 95 },
+        { id: 9, name: 'Cattleya', price: 40, stock: 60 },
+        { id: 10, name: 'Correction Tape', price: 20, stock: 15 },
+        { id: 11, name: 'Garbage Bags', price: 40, stock: 75 },
+
+        // ─── SANITARY & HYGIENE SECTION ─────────────────────────────────────
+        { id: 12, name: 'Sanitary Napkins', price: 30, stock: 80 },
+        { id: 13, name: 'Alcohol', price: 60, stock: 45 },
+        { id: 14, name: 'Markers', price: 20, stock: 35 },
+        { id: 15, name: 'Wet Wipes', price: 20, stock: 55 },
+        { id: 16, name: 'Tissue', price: 20, stock: 120 }
       ];
+      
       items = await Item.insertMany(defaultItems);
     }
     
