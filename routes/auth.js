@@ -325,7 +325,7 @@ router.post('/admin/verify-redemption', async (req, res) => {
         // ◄ FIX: This instantly drops their running account balance in the database cluster!
         $inc: { points: -Number(totalCost) }, 
         $push: {
-          history: {
+          recentActivity: {
             type: "redeem",
             points: -Number(totalCost), 
             date: new Date(),
