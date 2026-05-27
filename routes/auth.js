@@ -365,11 +365,11 @@ router.get('/admin/bottle-stats', async (req, res) => {
     // Helper helper function to run the MongoDB unwind + aggregation pipeline
     const getIntakeSum = async (startDate) => {
       const result = await User.aggregate([
-        { $unwind: "$history" }, // Flatten the history array elements out into separate documents
+        { $unwind: "$recentActivity" }, // Flatten the recentActivityss array elements out into separate documents
         { 
           $match: { 
-            "history.type": "deposit",
-            "history.date": { $gte: startDate }
+            "recentActivity.type": "deposit",
+            "recentActivity.date": { $gte: startDate }
           } 
         },
         {
@@ -378,7 +378,7 @@ router.get('/admin/bottle-stats', async (req, res) => {
           $project: {
             bottlesCount: {
               $convert: {
-                input: { $arrayElemAt: [{ $split: ["$history.description", " "] }, 0] },
+                input: { $arrayElemAt: [{ $split: ["$recentActivity.description", " "] }, 0] },
                 to: "int",
                 onError: 0,
                 onNull: 0
