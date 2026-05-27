@@ -33,7 +33,7 @@ const UserSchema = new mongoose.Schema({
     enum: ['user', 'admin'],
     default: 'user'
   },
-  history: [
+  recentActivity: [
     {
       action: { type: String },       
       type: { type: String },        
