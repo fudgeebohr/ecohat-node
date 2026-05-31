@@ -539,4 +539,34 @@ router.get('/admin/profile', async (req, res) => {
   }
 });
 
+router.post('/forgot-password-user', async (req, res) => {
+  try {
+    const { studentNumber, programAndYear, newPassword } = req.body;
+
+    // 1. Verify the student exists in the database
+    const user = await User.findOne({ studentNumber, role: 'user' });
+    if (!user) {
+      return res.status(404).json({ message: "Student number not found in our campus records." });
+    }
+
+    // 2. Validate security credentials (verifying their registered Section/Program matches)
+    if (user.programAndYear.toLowerCase().trim() !== programAndYear.toLowerCase().trim()) {
+      return res.status(401).json({ message: "Security verification failed: Program & Year mismatch." });
+    }
+
+    // 3. Hash the new password safely
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // 4. Update the database cluster entry
+    user.password = hashedPassword;
+    await user.save();
+
+    res.json({ success: true, message: "Password updated successfully! You can now log in." });
+  } catch (err) {
+    console.error("Recovery failure loop:", err);
+    res.status(500).json({ message: "Server error during account recovery execution." });
+  }
+});
+
 module.exports = router;
