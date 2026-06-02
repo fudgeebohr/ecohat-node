@@ -392,7 +392,6 @@ router.get('/admin/bottle-stats', async (req, res) => {
 
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    // Helper helper function to run the MongoDB unwind + aggregation pipeline
 // 1. Updated Helper Function Targeting recentActivity Safely
     const getIntakeSum = async (startDate) => {
       const result = await User.aggregate([
@@ -432,7 +431,7 @@ router.get('/admin/bottle-stats', async (req, res) => {
           }
         },
         
-        // Stage 5: Extract bottle metrics (Parses string description or falls back to points math)
+        // Stage 5: Extract bottle metrics (Parses string description or falls back to points math safely)
         {
           $project: {
             bottlesCount: {
@@ -450,8 +449,8 @@ router.get('/admin/bottle-stats', async (req, res) => {
                     0
                   ]
                 },
-                // Fallback math calculation (Points divided by 2 -> 1 Bottle = 2 Points rule compliance)
-                then: { $abs: { $int: { $divide: ["$recentActivity.points", 2] } } },
+                // FIXED: Swapped $int for $trunc and wrapped with $abs for absolute universal compatibility
+                then: { $abs: { $trunc: { $divide: ["$recentActivity.points", 2] } } },
                 else: {
                   $convert: {
                     input: { $arrayElemAt: [{ $split: ["$recentActivity.description", " "] }, 0] },
