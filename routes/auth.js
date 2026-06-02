@@ -246,6 +246,73 @@ router.post('/cart/sync', async (req, res) => {
   }
 });
 
+router.post('/rewards/checkout-cart', async (req, res) => {
+  try {
+    const { items, totalCost } = req.body;
+    
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: 'No token provided' });
+    
+    // Explicitly pull in jwt if it isn't running globally in this scope closure
+    const jwt = require('jsonwebtoken');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    const user = await User.findById(decoded.id);
+    if (!user) return res.status(404).json({ message: "User profile missing." });
+
+    // Still validate balance thresholds on generation to prevent spamming
+    if (user.points < totalCost) {
+      return res.status(400).json({ message: "Insufficient points balance." });
+    }
+
+    // 1. Generate the unique voucher code reference string
+    const uniqueBatchToken = `ECO-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+    const cartSummaryText = items && items.length > 0 
+      ? items.map(i => `${i.quantity}x ${i.name}`).join(', ')
+      : 'School Supplies Package';
+
+    // ─── CRITICAL CHANGE: DIRECT RECOVERY LOG INDEXING ENGINE ─────────────
+    try {
+      // Force inline resolution to guarantee tracking matches compilation routes
+      const VoucherModel = require('../models/Voucher');
+
+      const newVoucher = new VoucherModel({
+        token: uniqueBatchToken,
+        studentNumber: user.studentNumber,
+        itemsSummary: cartSummaryText,
+        totalCost: Number(totalCost) // Ensure cast formatting stability
+      });
+
+      // Force runtime execution thread to block until Atlas indexes the entry
+      const savedDoc = await newVoucher.save();
+      console.log("✅ [DATABASE TRANSACTION LOG]: Voucher indexed successfully:", savedDoc.token);
+    } catch (dbError) {
+      console.error("❌ [DATABASE CRASH LOG]: Voucher indexing failed:", dbError.message);
+      return res.status(500).json({ 
+        success: false, 
+        message: "Kiosk tracking database error. Voucher token generation aborted." 
+      });
+    }
+    // ─────────────────────────────────────────────────────────────────────
+
+    // 2. Clear out their active cloud bag array profile since it's now wrapped inside a token
+    user.cart = [];
+    await user.save();
+
+    // 3. Return the payload. The user's points stay untouched for now!
+    res.json({
+      success: true,
+      qrTokenString: uniqueBatchToken,
+      totalCost: totalCost,
+      summary: cartSummaryText
+    });
+
+  } catch (error) {
+    console.error("Checkout validation error:", error);
+    res.status(500).json({ message: "Internal server error during token generation." });
+  }
+});
+
 router.post('/admin/verify-redemption', async (req, res) => {
   try {
     const { qrTokenString, studentNumber, totalCost, summary } = req.body;
@@ -529,55 +596,6 @@ router.post('/forgot-password-user', async (req, res) => {
   } catch (err) {
     console.error("Recovery failure loop:", err);
     res.status(500).json({ message: "Server error during account recovery execution." });
-  }
-});
-
-router.post('/rewards/checkout-cart', async (req, res) => {
-  try {
-    const { items, totalCost } = req.body;
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) return res.status(401).json({ message: 'No token provided' });
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    const user = await User.findById(decoded.id);
-    if (!user) return res.status(404).json({ message: "User profile missing." });
-    if (user.points < totalCost) return res.status(400).json({ message: "Insufficient points balance." });
-
-    const uniqueBatchToken = `ECO-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
-    const cartSummaryText = items.map(i => `${i.quantity}x ${i.name}`).join(', ');
-
-    // ─── RUNNING EXPLICIT INLINE VALIDATION CHECK ───────────────────────
-    try {
-      // Force require inline to ensure context tracking matches exactly
-      const VoucherModel = require('../models/Voucher'); 
-
-      const newVoucher = new VoucherModel({
-        token: uniqueBatchToken,
-        studentNumber: user.studentNumber,
-        itemsSummary: cartSummaryText,
-        totalCost: Number(totalCost)
-      });
-      
-      const savedDoc = await newVoucher.save();
-      console.log("➡️ MongoDB Write Confirmation Document:", savedDoc);
-      
-    } catch (dbError) {
-      console.error("❌ CRITICAL DATABASE LOG ERROR:", dbError.message);
-      return res.status(500).json({ success: false, message: "Database write error tracking voucher token." });
-    }
-    // ───────────────────────────────────────────────────────────────────
-
-    user.cart = [];
-    await user.save();
-
-    res.json({
-      success: true,
-      qrTokenString: uniqueBatchToken,
-      totalCost: totalCost,
-      summary: cartSummaryText
-    });
-  } catch (error) {
-    res.status(500).json({ message: "Internal server error during token generation." });
   }
 });
 

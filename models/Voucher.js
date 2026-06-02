@@ -9,4 +9,4 @@ const VoucherSchema = new mongoose.Schema({
   dateCreated: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model('Voucher', VoucherSchema, 'vouchers');
+module.exports = mongoose.model('Voucher', VoucherSchema);
