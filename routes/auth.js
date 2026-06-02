@@ -1,3 +1,4 @@
+const Voucher = require('../models/Voucher');
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
@@ -6,7 +7,6 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const Item = require('../models/Item');
-const Voucher = require('../models/Voucher');
 
 // ==========================================
 // 1. STUDENT REGISTER
@@ -584,14 +584,21 @@ router.post('/rewards/checkout-cart', async (req, res) => {
     const uniqueBatchToken = `ECO-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
     const cartSummaryText = items.map(i => `${i.quantity}x ${i.name}`).join(', ');
 
-    // ─── NEW: SAVE VOUCHER FOR ADMIN LOOKUP AUTOMATION ───────────────────
-    const newVoucher = new Voucher({
-      token: uniqueBatchToken,
-      studentNumber: user.studentNumber,
-      itemsSummary: cartSummaryText,
-      totalCost: totalCost
-    });
-    await newVoucher.save();
+    try {
+      const newVoucher = new Voucher({
+        token: uniqueBatchToken,
+        studentNumber: user.studentNumber,
+        itemsSummary: cartSummaryText,
+        totalCost: Number(totalCost) // Ensure cast stability
+      });
+      
+      // Force Node to wait completely until MongoDB confirms indexing
+      await newVoucher.save();
+      console.log(`✅ Voucher successfully indexed in MongoDB Atlas: ${uniqueBatchToken}`);
+    } catch (dbError) {
+      console.error("❌ MongoDB Voucher Indexing Failed:", dbError);
+      return res.status(500).json({ message: "Database write error tracking voucher token." });
+    }
 
     user.cart = [];
     await user.save();
