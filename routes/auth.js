@@ -1,4 +1,4 @@
-module.exports = mongoose.model('Voucher', VoucherSchema, 'vouchers');
+const Voucher = require('../models/Voucher');
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
