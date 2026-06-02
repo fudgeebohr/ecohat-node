@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const Item = require('../models/Item');
+const Voucher = require('../models/Voucher');
 
 // ==========================================
 // 1. STUDENT REGISTER
@@ -566,6 +567,69 @@ router.post('/forgot-password-user', async (req, res) => {
   } catch (err) {
     console.error("Recovery failure loop:", err);
     res.status(500).json({ message: "Server error during account recovery execution." });
+  }
+});
+
+router.post('/rewards/checkout-cart', async (req, res) => {
+  try {
+    const { items, totalCost } = req.body;
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: 'No token provided' });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    const user = await User.findById(decoded.id);
+    if (!user) return res.status(404).json({ message: "User profile missing." });
+    if (user.points < totalCost) return res.status(400).json({ message: "Insufficient points balance." });
+
+    const uniqueBatchToken = `ECO-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
+    const cartSummaryText = items.map(i => `${i.quantity}x ${i.name}`).join(', ');
+
+    // ─── NEW: SAVE VOUCHER FOR ADMIN LOOKUP AUTOMATION ───────────────────
+    const newVoucher = new Voucher({
+      token: uniqueBatchToken,
+      studentNumber: user.studentNumber,
+      itemsSummary: cartSummaryText,
+      totalCost: totalCost
+    });
+    await newVoucher.save();
+
+    user.cart = [];
+    await user.save();
+
+    res.json({
+      success: true,
+      qrTokenString: uniqueBatchToken,
+      totalCost: totalCost,
+      summary: cartSummaryText
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error during token generation." });
+  }
+});
+
+// GET /api/auth/admin/lookup-voucher/:token
+router.get('/admin/lookup-voucher/:token', async (req, res) => {
+  try {
+    const voucher = await Voucher.findOne({ token: req.params.token.toUpperCase().trim() });
+    
+    if (!voucher) {
+      return res.status(404).json({ success: false, message: "Voucher reference code not found." });
+    }
+    if (voucher.isRedeemed) {
+      return res.status(400).json({ success: false, message: "This voucher code has already been claimed." });
+    }
+
+    res.json({
+      success: true,
+      voucher: {
+        token: voucher.token,
+        studentNum: voucher.studentNumber,
+        items: voucher.itemsSummary,
+        cost: voucher.totalCost
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error querying reference token parameters." });
   }
 });
 
