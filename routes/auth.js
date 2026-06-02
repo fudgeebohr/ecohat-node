@@ -1,4 +1,4 @@
-const Voucher = require('../models/Voucher');
+module.exports = mongoose.model('Voucher', VoucherSchema, 'vouchers');
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
@@ -584,21 +584,26 @@ router.post('/rewards/checkout-cart', async (req, res) => {
     const uniqueBatchToken = `ECO-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
     const cartSummaryText = items.map(i => `${i.quantity}x ${i.name}`).join(', ');
 
+    // ─── RUNNING EXPLICIT INLINE VALIDATION CHECK ───────────────────────
     try {
-      const newVoucher = new Voucher({
+      // Force require inline to ensure context tracking matches exactly
+      const VoucherModel = require('../models/Voucher'); 
+
+      const newVoucher = new VoucherModel({
         token: uniqueBatchToken,
         studentNumber: user.studentNumber,
         itemsSummary: cartSummaryText,
-        totalCost: Number(totalCost) // Ensure cast stability
+        totalCost: Number(totalCost)
       });
       
-      // Force Node to wait completely until MongoDB confirms indexing
-      await newVoucher.save();
-      console.log(`✅ Voucher successfully indexed in MongoDB Atlas: ${uniqueBatchToken}`);
+      const savedDoc = await newVoucher.save();
+      console.log("➡️ MongoDB Write Confirmation Document:", savedDoc);
+      
     } catch (dbError) {
-      console.error("❌ MongoDB Voucher Indexing Failed:", dbError);
-      return res.status(500).json({ message: "Database write error tracking voucher token." });
+      console.error("❌ CRITICAL DATABASE LOG ERROR:", dbError.message);
+      return res.status(500).json({ success: false, message: "Database write error tracking voucher token." });
     }
+    // ───────────────────────────────────────────────────────────────────
 
     user.cart = [];
     await user.save();
