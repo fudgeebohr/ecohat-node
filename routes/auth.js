@@ -246,44 +246,6 @@ router.post('/cart/sync', async (req, res) => {
   }
 });
 
-router.post('/rewards/checkout-cart', async (req, res) => {
-  try {
-    const { items, totalCost } = req.body;
-    
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) return res.status(401).json({ message: 'No token provided' });
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    const user = await User.findById(decoded.id);
-    if (!user) return res.status(404).json({ message: "User profile missing." });
-
-    // Still validate balance thresholds on generation to prevent spamming
-    if (user.points < totalCost) {
-      return res.status(400).json({ message: "Insufficient points balance." });
-    }
-
-    // 1. Generate the unique voucher code reference string
-    const uniqueBatchToken = `ECO-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
-    const cartSummaryText = items.map(i => `${i.quantity}x ${i.name}`).join(', ');
-
-    // 2. Clear out their active cloud bag array profile since it's now wrapped inside a token
-    user.cart = [];
-    await user.save();
-
-    // 3. Return the payload. The user's points stay untouched for now!
-    res.json({
-      success: true,
-      qrTokenString: uniqueBatchToken,
-      totalCost: totalCost,
-      summary: cartSummaryText
-    });
-
-  } catch (error) {
-    console.error("Checkout validation error:", error);
-    res.status(500).json({ message: "Internal server error during token generation." });
-  }
-});
-
 router.post('/admin/verify-redemption', async (req, res) => {
   try {
     const { qrTokenString, studentNumber, totalCost, summary } = req.body;
