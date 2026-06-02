@@ -393,29 +393,79 @@ router.get('/admin/bottle-stats', async (req, res) => {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     // Helper helper function to run the MongoDB unwind + aggregation pipeline
+// 1. Updated Helper Function Targeting recentActivity Safely
     const getIntakeSum = async (startDate) => {
       const result = await User.aggregate([
-        { $unwind: "$recentActivity" }, // Flatten the recentActivityss array elements out into separate documents
+        // Stage 1: Flatten the embedded recentActivity array records out into distinct documents
+        { $unwind: "$recentActivity" }, 
+        
+        // Stage 2: Loose-matching for machine action or manual database mock tags
         { 
           $match: { 
-            "recentActivity.type": "deposit",
-            "recentActivity.date": { $gte: startDate }
+            $or: [
+              { "recentActivity.type": "deposit" },
+              { "recentActivity.type": "bottle" },
+              { "recentActivity.type": { $regex: /deposit|bottle/i } } 
+            ]
           } 
         },
+        
+        // Stage 3: Project the object and cast string timestamps into solid MongoDB Date objects
         {
-          // We need to parse out the number of bottles from the description string
-          // e.g., "24 Bottles Deposited" -> extract 24
           $project: {
-            bottlesCount: {
+            recentActivity: 1,
+            activityDate: {
               $convert: {
-                input: { $arrayElemAt: [{ $split: ["$recentActivity.description", " "] }, 0] },
-                to: "int",
-                onError: 0,
-                onNull: 0
+                input: "$recentActivity.date",
+                to: "date",
+                onError: new Date(0), 
+                onNull: new Date(0)
               }
             }
           }
         },
+        
+        // Stage 4: Filter out any items that fall outside our designated time boundary window
+        {
+          $match: {
+            "activityDate": { $gte: startDate }
+          }
+        },
+        
+        // Stage 5: Extract bottle metrics (Parses string description or falls back to points math)
+        {
+          $project: {
+            bottlesCount: {
+              $cond: {
+                if: {
+                  $eq: [
+                    {
+                      $convert: {
+                        input: { $arrayElemAt: [{ $split: ["$recentActivity.description", " "] }, 0] },
+                        to: "int",
+                        onError: 0,
+                        onNull: 0
+                      }
+                    },
+                    0
+                  ]
+                },
+                // Fallback math calculation (Points divided by 2 -> 1 Bottle = 2 Points rule compliance)
+                then: { $abs: { $int: { $divide: ["$recentActivity.points", 2] } } },
+                else: {
+                  $convert: {
+                    input: { $arrayElemAt: [{ $split: ["$recentActivity.description", " "] }, 0] },
+                    to: "int",
+                    onError: 0,
+                    onNull: 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        
+        // Stage 6: Compute the unified summation total of all filtered bottle intake variables
         { 
           $group: { 
             _id: null, 
@@ -426,7 +476,7 @@ router.get('/admin/bottle-stats', async (req, res) => {
       return result.length > 0 ? result[0].total : 0;
     };
 
-    // 2. Execute aggregations in parallel paths
+    // 2. Execute aggregations in parallel paths seamlessly
     const [todayCount, weeklyCount, monthlyCount] = await Promise.all([
       getIntakeSum(startOfToday),
       getIntakeSum(startOfWeek),
