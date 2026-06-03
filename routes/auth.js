@@ -197,6 +197,9 @@ router.get('/profile', async (req, res) => {
 });
 
 // PUT route to update the user profile
+// =========================================================================
+// UPDATED: PUT PROFILE ROUTE WITH AUTOMATED INLINE HARDWARE INTERCEPTOR
+// =========================================================================
 router.put('/profile', async (req, res) => { 
   try {
     const token = req.headers.authorization?.split(' ')[1];
@@ -206,12 +209,68 @@ router.put('/profile', async (req, res) => {
     let user = await User.findById(decoded.id); 
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const { fullName, programAndYear, studentNumber, privacyMode } = req.body;
+    const { fullName, programAndYear, studentNumber, privacyMode, recentActivity, points, totalPointsEarned } = req.body;
 
+    // ─── HARDWARE DEPOSIT INTERCEPTOR MACHINE ────────────────────────────
+    // If the incoming request has a higher totalPointsEarned value, a bottle was deposited!
+    if (totalPointsEarned && totalPointsEarned > user.totalPointsEarned) {
+      const currentTotal = user.totalPointsEarned || 0;
+      const newTotal = Number(totalPointsEarned);
+
+      // Define milestone boundaries matching your requirements
+      const milestones = [
+        { name: "Eco Crusader",   threshold: 151, bonus: 15 },
+        { name: "Planet Protector", threshold: 251, bonus: 20 },
+        { name: "Nature Knight",    threshold: 351, bonus: 25 }
+      ];
+
+      for (const milestone of milestones) {
+        // Validate if their previous score was below the bracket, but this deposit pushes them over it
+        if (newTotal >= milestone.threshold && currentTotal < milestone.threshold) {
+          
+          // Force an incremental database update block immediately
+          await User.updateOne(
+            { _id: user._id },
+            {
+              $inc: { 
+                points: milestone.bonus,
+                totalPointsEarned: milestone.bonus // Integrates the milestone bonus into running balances
+              },
+              $push: {
+                recentActivity: {
+                  type: "Badge Reward",
+                  points: milestone.bonus,
+                  date: new Date(),
+                  description: `Earned '${milestone.name}' Badge`
+                }
+              }
+            }
+          );
+          console.log(`🎉 Badge Milestone Cross Captured: +${milestone.bonus} pts awarded to ${user.fullName}`);
+          
+          // Adjust our local tracking variables so the response down below reflects the updated numbers instantly
+          user.points += milestone.bonus;
+          user.totalPointsEarned += milestone.bonus;
+          break; 
+        }
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────
+
+    // Map your regular incoming fields updates
     if (fullName) user.fullName = fullName;
     if (programAndYear) user.programAndYear = programAndYear;
     if (studentNumber) user.studentNumber = studentNumber;
     if (privacyMode !== undefined) user.privacyMode = privacyMode;
+    
+    // If the hardware pushed an array tracking log, append it to their activity history list
+    if (recentActivity) {
+      user.recentActivity.push(recentActivity);
+    }
+    
+    // Sync base variables
+    if (points !== undefined) user.points = points;
+    if (totalPointsEarned !== undefined) user.totalPointsEarned = totalPointsEarned;
 
     await user.save();
     
@@ -220,6 +279,7 @@ router.put('/profile', async (req, res) => {
       ...user.toObject(),
       ...rank
     });
+
   } catch (error) {
     console.error("Profile update error:", error);
     res.status(500).send('Server Error');
