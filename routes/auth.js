@@ -14,6 +14,13 @@ const Item = require('../models/Item');
 router.post('/register-user', async (req, res) => {
     try {
         const { fullName, studentNumber, programAndYear, password } = req.body;
+        const studentNumberRegex = /^\d{4}-\d{5}-BN-\d{1}$/;
+        
+        if (!studentNumberRegex.test(studentNumber)) {
+            return res.status(400).json({ 
+                message: "Registration rejected: Student number format must strictly match XXXX-XXXXX-BN-X (e.g., 2022-00211-BN-0)." 
+            });
+        }
 
         let user = await User.findOne({ studentNumber });
         if (user) return res.status(400).json({ message: "Student number already registered." });
