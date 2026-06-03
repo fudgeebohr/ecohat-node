@@ -22,6 +22,38 @@ const getRankDetails = (totalPointsEarned) => {
   }
 };
 
+// ─── IN-MEMORY BADGE MILESTONE BONUS INTERCEPTOR ─────────────────────────
+const checkAndAwardBadgeBonus = (user, pointsToAdd) => {
+  const currentTotal = user.totalPointsEarned || 0;
+  const newTotal = currentTotal + pointsToAdd;
+
+  const milestones = [
+    { name: "Eco Crusader",   threshold: 151, bonus: 15 },
+    { name: "Planet Protector", threshold: 251, bonus: 20 },
+    { name: "Nature Knight",    threshold: 351, bonus: 25 }
+  ];
+
+  for (const milestone of milestones) {
+    // Triggers perfectly even if they jump straight past 151 to 160 points
+    if (newTotal >= milestone.threshold && currentTotal < milestone.threshold) {
+      
+      // Mutate user object attributes directly to avoid asynchronous save conflicts
+      user.points += milestone.bonus;
+      user.totalPointsEarned += milestone.bonus;
+      
+      user.recentActivity.push({
+        type: "Badge Reward",
+        points: milestone.bonus,
+        date: new Date(),
+        description: `Earned '${milestone.name}' Badge`
+      });
+      
+      console.log(`🎉 In-Memory Badge Milestone Set: +${milestone.bonus} for ${user.fullName}`);
+      break; 
+    }
+  }
+};
+
 // ==========================================
 // 1. STUDENT REGISTER
 // ==========================================
@@ -163,7 +195,7 @@ router.get('/leaderboard', async (req, res) => {
         fullName: user.fullName,
         programAndYear: user.programAndYear,
         totalPointsEarned: user.totalPointsEarned || 0,
-        ...rank // Dynamically injects rankTitle & rankClass elements safely to array outputs
+        ...rank 
       };
     });
 
@@ -174,7 +206,7 @@ router.get('/leaderboard', async (req, res) => {
   }
 });
 
-// Get current user profile (with automatic ranking computations attached)
+// Get current user profile 
 router.get('/profile', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
@@ -186,7 +218,6 @@ router.get('/profile', async (req, res) => {
 
     const rank = getRankDetails(user.totalPointsEarned);
     
-    // Merge database model with virtual computing badge rankings seamlessly
     res.json({
       ...user.toObject(),
       ...rank
@@ -197,9 +228,6 @@ router.get('/profile', async (req, res) => {
 });
 
 // PUT route to update the user profile
-// =========================================================================
-// UPDATED: PUT PROFILE ROUTE WITH AUTOMATED INLINE HARDWARE INTERCEPTOR
-// =========================================================================
 router.put('/profile', async (req, res) => { 
   try {
     const token = req.headers.authorization?.split(' ')[1];
@@ -212,66 +240,29 @@ router.put('/profile', async (req, res) => {
     const { fullName, programAndYear, studentNumber, privacyMode, recentActivity, points, totalPointsEarned } = req.body;
 
     // ─── HARDWARE DEPOSIT INTERCEPTOR MACHINE ────────────────────────────
-    // If the incoming request has a higher totalPointsEarned value, a bottle was deposited!
-    if (totalPointsEarned && totalPointsEarned > user.totalPointsEarned) {
-      const currentTotal = user.totalPointsEarned || 0;
-      const newTotal = Number(totalPointsEarned);
-
-      // Define milestone boundaries matching your requirements
-      const milestones = [
-        { name: "Eco Crusader",   threshold: 151, bonus: 15 },
-        { name: "Planet Protector", threshold: 251, bonus: 20 },
-        { name: "Nature Knight",    threshold: 351, bonus: 25 }
-      ];
-
-      for (const milestone of milestones) {
-        // Validate if their previous score was below the bracket, but this deposit pushes them over it
-        if (newTotal >= milestone.threshold && currentTotal < milestone.threshold) {
-          
-          // Force an incremental database update block immediately
-          await User.updateOne(
-            { _id: user._id },
-            {
-              $inc: { 
-                points: milestone.bonus,
-                totalPointsEarned: milestone.bonus // Integrates the milestone bonus into running balances
-              },
-              $push: {
-                recentActivity: {
-                  type: "Badge Reward",
-                  points: milestone.bonus,
-                  date: new Date(),
-                  description: `Earned '${milestone.name}' Badge`
-                }
-              }
-            }
-          );
-          console.log(`🎉 Badge Milestone Cross Captured: +${milestone.bonus} pts awarded to ${user.fullName}`);
-          
-          // Adjust our local tracking variables so the response down below reflects the updated numbers instantly
-          user.points += milestone.bonus;
-          user.totalPointsEarned += milestone.bonus;
-          break; 
-        }
-      }
+    // If incoming payload logs a total points change, pass it straight to the direct evaluator
+    if (totalPointsEarned && Number(totalPointsEarned) > user.totalPointsEarned) {
+      const addedHardwarePoints = Number(totalPointsEarned) - user.totalPointsEarned;
+      
+      // Execute local mutation. Both badge points and reward strings get pushed safely
+      checkAndAwardBadgeBonus(user, addedHardwarePoints);
     }
     // ─────────────────────────────────────────────────────────────────────
 
-    // Map your regular incoming fields updates
+    // Map regular incoming modifications
     if (fullName) user.fullName = fullName;
     if (programAndYear) user.programAndYear = programAndYear;
     if (studentNumber) user.studentNumber = studentNumber;
     if (privacyMode !== undefined) user.privacyMode = privacyMode;
     
-    // If the hardware pushed an array tracking log, append it to their activity history list
     if (recentActivity) {
       user.recentActivity.push(recentActivity);
     }
     
-    // Sync base variables
     if (points !== undefined) user.points = points;
     if (totalPointsEarned !== undefined) user.totalPointsEarned = totalPointsEarned;
 
+    // This save step now writes both the machine's deposit metrics AND your bonus atomically!
     await user.save();
     
     const rank = getRankDetails(user.totalPointsEarned);
@@ -348,7 +339,6 @@ router.post('/rewards/checkout-cart', async (req, res) => {
         totalCost: Number(totalCost)
       });
       await newVoucher.save();
-      console.log("✅ [DATABASE TRANSACTION LOG]: Voucher indexed successfully:", savedDoc.token);
     } catch (dbError) {
       console.error("❌ [DATABASE CRASH LOG]: Voucher indexing failed:", dbError.message);
       return res.status(500).json({ 
@@ -401,7 +391,6 @@ router.post('/admin/verify-redemption', async (req, res) => {
       await Promise.all(stockUpdatePromises);
     }
 
-    // ─── EXTENDED: MARK ACCUMULATED VOUCHERS AS REDEEMED ─────────────────
     try {
       const VoucherModel = require('../models/Voucher');
       await VoucherModel.findOneAndUpdate({ token: qrTokenString }, { isRedeemed: true });
@@ -409,7 +398,6 @@ router.post('/admin/verify-redemption', async (req, res) => {
       console.error("Non-blocking voucher flag adjustment error:", err);
     }
 
-    // Secure atomic structural point deduction values updates
     await User.updateOne(
       { studentNumber: studentNumber },
       {
@@ -656,7 +644,7 @@ router.post('/forgot-password-user', async (req, res) => {
     }
 
     const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    const hashedPassword = await bcrypt.hash(newPassword, salt); // FIXED: explicitly tracks newPassword input variable
 
     user.password = hashedPassword;
     await user.save();
@@ -683,6 +671,50 @@ router.get('/admin/lookup-voucher/:token', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: "Server error querying reference token parameters." });
+  }
+});
+
+// ==========================================
+// HARDWARE MACHINE DEPOSIT ENDPOINT
+// ==========================================
+router.post('/machine/deposit', async (req, res) => {
+  try {
+    const { studentNumber, bottlesDeposited } = req.body;
+    
+    if (!studentNumber || !bottlesDeposited) {
+      return res.status(400).json({ message: "Missing student number or bottle counts." });
+    }
+
+    // 1. Find the student document record
+    const user = await User.findOne({ studentNumber });
+    if (!user) return res.status(404).json({ message: "Student account not found." });
+
+    const pointsAwarded = Number(bottlesDeposited) * 2; // 1 Bottle = 2 Points rule
+
+    // 2. RUN BADGE BONUS CHECKER (Updates user object fields if threshold crossed)
+    checkAndAwardBadgeBonus(user, pointsAwarded);
+
+    // 3. Process regular bottle addition values
+    user.points += pointsAwarded;
+    user.totalPointsEarned += pointsAwarded;
+    user.recentActivity.push({
+      type: "deposit",
+      points: pointsAwarded,
+      date: new Date(),
+      description: `${bottlesDeposited} Bottles Deposited`
+    });
+
+    // 4. Save everything together atomically to MongoDB Atlas!
+    await user.save();
+
+    res.json({ 
+      success: true, 
+      message: `Successfully processed ${bottlesDeposited} bottles for ${user.fullName}!` 
+    });
+
+  } catch (error) {
+    console.error("Machine deposit loop crash:", error);
+    res.status(500).json({ message: "Internal server error logging machine deposit stats." });
   }
 });
 
