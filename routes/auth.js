@@ -79,16 +79,7 @@ router.post('/register-user', async (req, res) => {
       studentNumber,
       programAndYear,
       password: hashedPassword,
-      role: 'user',
-      // Seed account with Green Guardian Initial Bonus Points layout
-      points: 10,
-      totalPointsEarned: 10,
-      recentActivity: [{
-        type: "Badge Reward",
-        points: 10,
-        date: new Date(),
-        description: "Earned 'Green Guardian' Badge"
-      }]
+      role: 'user'
     });
 
     await user.save();
