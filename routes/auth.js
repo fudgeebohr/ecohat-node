@@ -7,6 +7,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const Item = require('../models/Item');
+const KioskSession = require('../models/KioskSession');
+const User = require('../models/User');
 
 // ─── CENTRALIZED BACKEND RANK HELPER FUNCTION ────────────────────────────
 const getRankDetails = (totalPointsEarned) => {
@@ -707,6 +709,114 @@ router.post('/machine/deposit', async (req, res) => {
     console.error("Machine deposit loop crash:", error);
     res.status(500).json({ message: "Internal server error logging machine deposit stats." });
   }
+});
+
+// 1. Start a kiosk session (called when student scans QR)
+router.post('/kiosk/start-session', authMiddleware, async (req, res) => {
+    try {
+        const { kioskId } = req.body;
+        const studentNumber = req.user.studentNumber; // from JWT
+
+        // Check if student is banned
+        const user = await User.findOne({ studentNumber });
+        if (!user) return res.status(404).json({ message: 'Student not found' });
+
+        if (user.bannedUntil && user.bannedUntil > new Date()) {
+            const hoursLeft = ((user.bannedUntil - new Date()) / 3600000).toFixed(1);
+            return res.status(403).json({ 
+                message: `Account banned for ${hoursLeft} more hours due to repeated violations` 
+            });
+        }
+
+        // Check if kiosk is already busy
+        const existing = await KioskSession.findOne({
+            kioskId,
+            status: { $in: ['pending', 'active'] },
+            expiresAt: { $gt: new Date() },
+        });
+
+        if (existing) {
+            return res.status(409).json({ 
+                message: 'Kiosk is busy — another student is currently using it' 
+            });
+        }
+
+        // Create new session
+        const session = await KioskSession.create({
+            kioskId,
+            studentNumber,
+            status: 'pending',
+            expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 min TTL
+        });
+
+        res.json({
+            sessionId: session._id,
+            studentName: user.fullName,
+            points: user.points,
+            warnings: user.warnings || 0,
+        });
+    } catch (err) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// 2. Send command to kiosk (called from student's phone)
+router.post('/kiosk/command', authMiddleware, async (req, res) => {
+    try {
+        const { sessionId, command } = req.body;
+        // command: "start_deposit", "another", "done", "cancel"
+
+        await KioskSession.updateOne(
+            { _id: sessionId },
+            { $set: { command } }
+        );
+
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// 3. Get kiosk session status (polled by student's phone every 1s)
+router.get('/kiosk/session-status', authMiddleware, async (req, res) => {
+    try {
+        const { sessionId } = req.query;
+        const session = await KioskSession.findById(sessionId);
+
+        if (!session) return res.status(404).json({ message: 'Session not found' });
+
+        // Also get latest user data
+        const user = await User.findOne({ studentNumber: session.studentNumber });
+
+        res.json({
+            status: session.status,
+            kioskStatus: session.kioskStatus,
+            lastResult: session.lastResult,
+            points: user?.points || 0,
+            warnings: user?.warnings || 0,
+        });
+    } catch (err) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// 4. Update session status (called by kiosk Pi — no auth needed, or use API key)
+router.post('/kiosk/status', async (req, res) => {
+    try {
+        const { kioskId, status, result } = req.body;
+
+        const update = { kioskStatus: status };
+        if (result) update.lastResult = result;
+
+        await KioskSession.updateOne(
+            { kioskId, status: 'active' },
+            { $set: update }
+        );
+
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ message: 'Server error' });
+    }
 });
 
 module.exports = router;

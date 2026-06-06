@@ -51,9 +51,17 @@ const UserSchema = new mongoose.Schema({
     type: Boolean, 
     default: false 
   },
+  warnings: { 
+    type: Number, 
+    default: 0 
+  },
+  bannedUntil: { 
+    type: Date, 
+    default: null 
+  },
   cart: [
     {
-      itemId: { type: Number, required: true }, // Matches your item.id
+      itemId: { type: Number, required: true }, 
       name: { type: String, required: true },
       price: { type: Number, required: true },
       quantity: { type: Number, required: true, default: 1 }
