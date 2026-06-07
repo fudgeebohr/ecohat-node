@@ -9,6 +9,8 @@ const crypto = require('crypto');
 const Item = require('../models/Item');
 const KioskSession = require('../models/KioskSession');
 const auth = require('../middleware/auth');
+const mongoose = require('mongoose');
+const db = mongoose.connection;
 
 // ─── CENTRALIZED BACKEND RANK HELPER FUNCTION ────────────────────────────
 const getRankDetails = (totalPointsEarned) => {
