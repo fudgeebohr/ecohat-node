@@ -1,4 +1,3 @@
-const mongoose = require('mongoose');
 const Voucher = require('../models/Voucher');
 const express = require('express');
 const router = express.Router();
@@ -713,13 +712,13 @@ router.post('/machine/deposit', async (req, res) => {
 });
 
 // 1. Start a kiosk session (called when student scans QR)
-router.post('/kiosk/start-session', auth, async (req, res) => {
+router.post('/kiosk/start-session', authMiddleware, async (req, res) => {
     try {
         const { kioskId, pin } = req.body;   // ← now includes pin
         const studentNumber = req.user.studentNumber;
 
         // 1. Validate pairing PIN (proves physical presence)
-        const pairing = await mongoose.connection.collection('kiosk_pairing').findOne({ kioskId });
+        const pairing = await db.collection('kiosk_pairing').findOne({ kioskId });
         if (!pairing || pairing.code !== pin || pairing.expiresAt < new Date()) {
             return res.status(403).json({ 
                 message: 'Invalid or expired code. Please enter the current code shown on the kiosk.' 
