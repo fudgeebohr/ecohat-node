@@ -712,7 +712,7 @@ router.post('/machine/deposit', async (req, res) => {
 });
 
 // 1. Start a kiosk session (called when student scans QR)
-router.post('/kiosk/start-session', authMiddleware, async (req, res) => {
+router.post('/kiosk/start-session', auth, async (req, res) => {
     try {
         const { kioskId } = req.body;
         const studentNumber = req.user.studentNumber; // from JWT
@@ -761,7 +761,7 @@ router.post('/kiosk/start-session', authMiddleware, async (req, res) => {
 });
 
 // 2. Send command to kiosk (called from student's phone)
-router.post('/kiosk/command', authMiddleware, async (req, res) => {
+router.post('/kiosk/command', auth, async (req, res) => {
     try {
         const { sessionId, command } = req.body;
         // command: "start_deposit", "another", "done", "cancel"
