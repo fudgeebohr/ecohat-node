@@ -13,6 +13,9 @@ const app = express();
 const profileRoutes = require('./routes/profile'); // check your exact path
 app.use('/api/profile', profileRoutes);
 
+const kioskRoutes = require('./routes/kiosk');
+app.use('/api', kioskRoutes);
+
 // Middleware
 app.use(cors({
   origin: ['https://eco-hat.onrender.com', 'http://localhost:5173'],
