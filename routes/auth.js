@@ -819,4 +819,79 @@ router.post('/kiosk/status', async (req, res) => {
     }
 });
 
+router.post('/admin/confirm-manual-redeem', async (req, res) => {
+  try {
+    const { token, studentNumber, totalCost, summary } = req.body;
+
+    if (!token || !studentNumber) {
+      return res.status(400).json({ success: false, message: "Voucher reference token and student identifier are required." });
+    }
+
+    const cleanToken = token.toUpperCase().trim();
+
+    // 1. Verify the voucher exists and hasn't been claimed yet
+    const voucher = await Voucher.findOne({ token: cleanToken });
+    if (!voucher) return res.status(404).json({ success: false, message: "Voucher reference code not found." });
+    if (voucher.isRedeemed) return res.status(400).json({ success: false, message: "This voucher has already been redeemed." });
+
+    // 2. Look up the student and check their points
+    const user = await User.findOne({ studentNumber });
+    if (!user) return res.status(404).json({ success: false, message: "Student account not found." });
+    if (user.points < totalCost) {
+      return res.status(400).json({ success: false, message: "Deduction failed: Student has insufficient points live." });
+    }
+
+    // 3. Decrement Kiosk inventory stock levels for the manual summary checklist items
+    if (summary && summary.trim() !== "") {
+      const itemSegments = summary.split(', ');
+      const stockUpdatePromises = itemSegments.map(async (segment) => {
+        const parts = segment.trim().split(' ');
+        if (parts.length >= 2) {
+          const qtyPart = parts[0]; 
+          const quantityClaimed = parseInt(qtyPart.replace('x', ''), 10);
+          const itemName = parts.slice(1).join(' '); 
+
+          if (!isNaN(quantityClaimed) && quantityClaimed > 0) {
+            await Item.findOneAndUpdate(
+              { name: itemName },
+              { $inc: { stock: -quantityClaimed } }
+            );
+          }
+        }
+      });
+      await Promise.all(stockUpdatePromises);
+    }
+
+    // 4. Update the Voucher model state to true
+    voucher.isRedeemed = true;
+    await voucher.save();
+
+    // 5. Deduct points and push history block simultaneously
+    await User.updateOne(
+      { studentNumber: studentNumber },
+      {
+        $inc: { points: -Number(totalCost) }, 
+        $push: {
+          recentActivity: {
+            type: "redeem",
+            points: -Number(totalCost), 
+            date: new Date(),
+            description: `${summary} Redeemed (Manual Entry)`,
+            qrReferenceCode: cleanToken 
+          }
+        }
+      }
+    );
+
+    res.json({ 
+      success: true, 
+      message: `Successfully processed manual redemption for ${user.fullName}! Voucher locked.` 
+    });
+
+  } catch (error) {
+    console.error("Admin manual confirm redemption failure:", error);
+    res.status(500).json({ success: false, message: "Server error executing manual confirmation steps." });
+  }
+});
+
 module.exports = router;
