@@ -8,7 +8,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const Item = require('../models/Item');
 const KioskSession = require('../models/KioskSession');
-const authMiddleware = require('../middleware/authMiddleware');
+const auth = require('../middleware/auth');
 
 // ─── CENTRALIZED BACKEND RANK HELPER FUNCTION ────────────────────────────
 const getRankDetails = (totalPointsEarned) => {
@@ -778,7 +778,7 @@ router.post('/kiosk/command', authMiddleware, async (req, res) => {
 });
 
 // 3. Get kiosk session status (polled by student's phone every 1s)
-router.get('/kiosk/session-status', authMiddleware, async (req, res) => {
+router.get('/kiosk/session-status', auth, async (req, res) => {
     try {
         const { sessionId } = req.query;
         const session = await KioskSession.findById(sessionId);
