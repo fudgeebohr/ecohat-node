@@ -13,7 +13,7 @@ const app = express();
 const profileRoutes = require('./routes/profile'); // check your exact path
 app.use('/api/profile', profileRoutes);
 
-const kioskRoutes = require('./routes/kiosk');
+const kioskRoutes = require('./routes/auth');
 app.use('/api', kioskRoutes);
 
 // Middleware
