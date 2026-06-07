@@ -8,7 +8,6 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const Item = require('../models/Item');
 const KioskSession = require('../models/KioskSession');
-const User = require('../models/User');
 
 // ─── CENTRALIZED BACKEND RANK HELPER FUNCTION ────────────────────────────
 const getRankDetails = (totalPointsEarned) => {
