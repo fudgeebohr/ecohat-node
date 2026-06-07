@@ -712,7 +712,7 @@ router.post('/machine/deposit', async (req, res) => {
 });
 
 // 1. Start a kiosk session (called when student scans QR)
-router.post('/kiosk/start-session', authMiddleware, async (req, res) => {
+router.post('/kiosk/start-session', auth, async (req, res) => {
     try {
         const { kioskId, pin } = req.body;   // ← now includes pin
         const studentNumber = req.user.studentNumber;
