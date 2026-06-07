@@ -712,21 +712,51 @@ router.post('/machine/deposit', async (req, res) => {
 });
 
 // 1. Start a kiosk session (called when student scans QR)
-router.post('/kiosk/start-session', auth, async (req, res) => {
+router.post('/kiosk/start-session', authMiddleware, async (req, res) => {
     try {
-        const { kioskId } = req.body;
-        const studentNumber = req.user.studentNumber; // from JWT
+        const { kioskId, pin } = req.body;   // ← now includes pin
+        const studentNumber = req.user.studentNumber;
 
-        // Check if student is banned
-        const user = await User.findOne({ studentNumber });
-        if (!user) return res.status(404).json({ message: 'Student not found' });
-
-        if (user.bannedUntil && user.bannedUntil > new Date()) {
-            const hoursLeft = ((user.bannedUntil - new Date()) / 3600000).toFixed(1);
+        // 1. Validate pairing PIN (proves physical presence)
+        const pairing = await db.collection('kiosk_pairing').findOne({ kioskId });
+        if (!pairing || pairing.code !== pin || pairing.expiresAt < new Date()) {
             return res.status(403).json({ 
-                message: `Account banned for ${hoursLeft} more hours due to repeated violations` 
+                message: 'Invalid or expired code. Please enter the current code shown on the kiosk.' 
             });
         }
+
+        // 2. Check ban
+        const user = await User.findOne({ studentNumber });
+        if (!user) return res.status(404).json({ message: 'Student not found' });
+        if (user.bannedUntil && user.bannedUntil > new Date()) {
+            const hrs = ((user.bannedUntil - new Date()) / 3600000).toFixed(1);
+            return res.status(403).json({ message: `Account banned for ${hrs} more hours` });
+        }
+
+        // 3. Check kiosk busy
+        const existing = await db.collection('kiosk_sessions').findOne({
+            kioskId, status: { $in: ['pending', 'active'] }, expiresAt: { $gt: new Date() }
+        });
+        if (existing) {
+            return res.status(409).json({ message: 'Kiosk is busy' });
+        }
+
+        // 4. Create session
+        const session = await KioskSession.create({
+            kioskId, studentNumber, status: 'pending',
+            expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+        });
+
+        res.json({
+            sessionId: session._id,
+            studentName: user.fullName,
+            points: user.points,
+            warnings: user.warnings || 0,
+        });
+    } catch (err) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
 
         // Check if kiosk is already busy
         const existing = await KioskSession.findOne({
