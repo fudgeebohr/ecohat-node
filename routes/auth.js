@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Voucher = require('../models/Voucher');
 const express = require('express');
 const router = express.Router();
@@ -712,13 +713,13 @@ router.post('/machine/deposit', async (req, res) => {
 });
 
 // 1. Start a kiosk session (called when student scans QR)
-router.post('/kiosk/start-session', authMiddleware, async (req, res) => {
+router.post('/kiosk/start-session', auth, async (req, res) => {
     try {
         const { kioskId, pin } = req.body;   // ← now includes pin
         const studentNumber = req.user.studentNumber;
 
         // 1. Validate pairing PIN (proves physical presence)
-        const pairing = await db.collection('kiosk_pairing').findOne({ kioskId });
+        const pairing = await mongoose.connection.collection('kiosk_pairing').findOne({ kioskId });
         if (!pairing || pairing.code !== pin || pairing.expiresAt < new Date()) {
             return res.status(403).json({ 
                 message: 'Invalid or expired code. Please enter the current code shown on the kiosk.' 
@@ -745,38 +746,6 @@ router.post('/kiosk/start-session', authMiddleware, async (req, res) => {
         const session = await KioskSession.create({
             kioskId, studentNumber, status: 'pending',
             expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-        });
-
-        res.json({
-            sessionId: session._id,
-            studentName: user.fullName,
-            points: user.points,
-            warnings: user.warnings || 0,
-        });
-    } catch (err) {
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
-        // Check if kiosk is already busy
-        const existing = await KioskSession.findOne({
-            kioskId,
-            status: { $in: ['pending', 'active'] },
-            expiresAt: { $gt: new Date() },
-        });
-
-        if (existing) {
-            return res.status(409).json({ 
-                message: 'Kiosk is busy — another student is currently using it' 
-            });
-        }
-
-        // Create new session
-        const session = await KioskSession.create({
-            kioskId,
-            studentNumber,
-            status: 'pending',
-            expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 min TTL
         });
 
         res.json({
