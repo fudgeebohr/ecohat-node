@@ -876,7 +876,7 @@ router.post('/admin/confirm-manual-redeem', async (req, res) => {
             type: "redeem",
             points: -Number(totalCost), 
             date: new Date(),
-            description: `${summary} Redeemed (Manual Entry)`,
+            description: `${summary} Redeemed`,
             qrReferenceCode: cleanToken 
           }
         }
